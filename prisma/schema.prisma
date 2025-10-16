@@ -50,23 +50,25 @@ model client_contacts {
 // DISTRIBUTION LISTS & NEWSLETTER
 // ============================================================================
 
-enum ListType {
-  CLIENTE
+enum tipo_distribution_list {
+  INSTITUCIONAL
+  SECTOR
+  PROYECTO
   PROSPECTO
-  PROVEEDOR
-  INTERNO
-  OTRO
+  CUSTOM
+
+  @@map("tipo_distribution_list")
 }
 
 model distribution_lists {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique
-  tipo        ListType @default(PROSPECTO)
+  id          String                  @id @default(uuid()) @db.Uuid
+  name        String                  @unique
+  tipo        tipo_distribution_list  @default(PROSPECTO)
   description String?
-  activa      Boolean  @default(true)
+  activa      Boolean                 @default(true)
   created_by  Int?
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  created_at  DateTime                @default(now())
+  updated_at  DateTime                @updatedAt
 
   // Relations
   contacts distribution_list_contacts[]
