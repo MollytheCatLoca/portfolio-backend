@@ -287,3 +287,47 @@ export async function cancelJob(jobId: string): Promise<boolean> {
     throw error;
   }
 }
+
+/**
+ * Create a new newsletter job
+ */
+export async function createJob(params: {
+  subject: string;
+  htmlContent: string;
+  textContent?: string;
+  listIds: string[];
+  scheduledAt?: Date;
+  createdBy?: number;
+}): Promise<QueueJob> {
+  try {
+    const prisma = getPrismaClient();
+
+    const job = await prisma.newsletter_queue.create({
+      data: {
+        subject: params.subject,
+        html_content: params.htmlContent,
+        text_content: params.textContent || null,
+        list_ids: params.listIds,
+        status: 'pending',
+        total_recipients: 0,
+        sent_count: 0,
+        failed_count: 0,
+        retry_count: 0,
+        max_retries: env.MAX_RETRIES,
+        scheduled_at: params.scheduledAt || null,
+        created_by: params.createdBy || null,
+      },
+    });
+
+    newsletterLogger.info('Job created', {
+      jobId: job.id,
+      subject: job.subject,
+      listIds: params.listIds,
+    });
+
+    return job as any as QueueJob;
+  } catch (error) {
+    logger.error('Error creating job:', error);
+    throw error;
+  }
+}
