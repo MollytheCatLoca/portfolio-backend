@@ -63,7 +63,7 @@ model distribution_lists {
   name        String   @unique
   tipo        ListType @default(PROSPECTO)
   description String?
-  active      Boolean  @default(true)
+  activa      Boolean  @default(true)
   created_by  Int?
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt

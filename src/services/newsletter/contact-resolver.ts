@@ -14,7 +14,7 @@ export async function getContactsFromLists(listIds: string[]): Promise<Contact[]
     const lists = await prisma.distribution_lists.findMany({
       where: {
         id: { in: listIds },
-        active: true,
+        activa: true,
       },
       include: {
         contacts: {
