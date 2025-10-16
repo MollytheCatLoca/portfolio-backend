@@ -24,17 +24,31 @@ router.get('/mailing/newsletter/queue/active', async (_req: Request, res: Respon
       getJobs('processing', 100),
     ]);
 
-    const jobs = [...pendingJobs, ...processingJobs].map((job) => ({
-      id: job.id,
-      title: job.subject || 'Sin título',
-      status: job.status,
-      progress: job.total_recipients > 0 
+    const jobs = [...pendingJobs, ...processingJobs].map((job) => {
+      const porcentaje = job.total_recipients > 0 
         ? Math.round((job.sent_count / job.total_recipients) * 100) 
-        : 0,
-      lists: job.list_ids || [],
-      created_at: job.created_at,
-      started_at: job.started_at,
-    }));
+        : 0;
+
+      return {
+        id: job.id,
+        title: job.subject || 'Sin título',
+        status: job.status,
+        progress: {
+          sent: job.sent_count,
+          total: job.total_recipients,
+          errors: job.failed_count,
+          porcentaje,
+          tasaExito: job.total_recipients > 0 
+            ? Math.round(((job.sent_count - job.failed_count) / job.total_recipients) * 100) 
+            : 0,
+        },
+        lists: (job.list_ids || []).map((id: string) => ({ id, name: id })),
+        created_at: job.created_at,
+        started_at: job.started_at,
+        retry_count: job.retry_count,
+        tiempo_estimado_segundos: null, // TODO: calcular basado en tasa de envío
+      };
+    });
 
     return sendSuccess(res, { jobs });
   } catch (error: any) {
