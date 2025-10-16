@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// CLIENT MANAGEMENT
+// ============================================================================
+
+model clients {
+  id            Int      @id @default(autoincrement())
+  company_name  String   @unique
+  tipo_cliente  String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  // Relations
+  client_contacts client_contacts[]
+}
+
+model client_contacts {
+  id          Int      @id @default(autoincrement())
+  client_id   Int
+  nombre      String
+  apellido    String
+  email       String
+  telefono    String?
+  cargo       String?
+  es_principal Boolean  @default(true)
+  activo      Boolean  @default(true)
+  notas       String?
+  created_by  Int?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  // Relations
+  client              clients                    @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  distribution_lists  distribution_list_contacts[]
+
+  @@unique([client_id, email])
+  @@index([email])
+  @@index([activo])
+}
+
+// ============================================================================
+// DISTRIBUTION LISTS & NEWSLETTER
+// ============================================================================
+
+enum ListType {
+  CLIENTE
+  PROSPECTO
+  PROVEEDOR
+  INTERNO
+  OTRO
+}
+
+model distribution_lists {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  tipo        ListType @default(PROSPECTO)
+  description String?
+  active      Boolean  @default(true)
+  created_by  Int?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  // Relations
+  contacts distribution_list_contacts[]
+}
+
+model distribution_list_contacts {
+  id         String   @id @default(uuid()) @db.Uuid
+  list_id    String   @db.Uuid
+  contact_id Int
+  added_by   Int?
+  added_at   DateTime @default(now())
+  notas      String?
+
+  // Relations
+  list    distribution_lists @relation(fields: [list_id], references: [id], onDelete: Cascade)
+  contact client_contacts    @relation(fields: [contact_id], references: [id], onDelete: Cascade)
+
+  @@unique([list_id, contact_id])
+  @@index([list_id])
+  @@index([contact_id])
+}
+
+// ============================================================================
+// NEWSLETTER QUEUE SYSTEM
+// ============================================================================
+
+model newsletter_queue {
+  id              String   @id @default(uuid()) @db.Uuid
+  subject         String
+  html_content    String
+  text_content    String?
+  list_ids        String[] @db.Uuid
+  status          String   @default("pending") // pending, processing, completed, error
+  total_recipients Int     @default(0)
+  sent_count      Int      @default(0)
+  failed_count    Int      @default(0)
+  retry_count     Int      @default(0)
+  max_retries     Int      @default(3)
+  error_message   String?
+  scheduled_at    DateTime?
+  started_at      DateTime?
+  completed_at    DateTime?
+  created_by      Int?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([status])
+  @@index([created_at])
+}
