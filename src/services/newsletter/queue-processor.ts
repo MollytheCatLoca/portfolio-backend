@@ -1,6 +1,6 @@
 import getPrismaClient from '../../config/database';
 import env from '../../config/env';
-import { QueueJob, ProcessJobResult, JobProgress, EmailParams } from './types';
+import { QueueJob, ProcessJobResult, EmailParams } from './types';
 import { getContactsFromLists, validateContacts } from './contact-resolver';
 import { sendBatchEmails } from './batch-sender';
 import logger, { newsletterLogger } from '../../utils/logger';

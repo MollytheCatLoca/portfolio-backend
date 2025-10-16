@@ -165,7 +165,7 @@ router.post('/cancel/:id', async (req: Request, res: Response) => {
  * GET /api/newsletter/stats
  * Get queue statistics
  */
-router.get('/stats', async (req: Request, res: Response) => {
+router.get('/stats', async (_req: Request, res: Response) => {
   try {
     const [pending, processing, completed, failed] = await Promise.all([
       getJobs('pending', 1000),

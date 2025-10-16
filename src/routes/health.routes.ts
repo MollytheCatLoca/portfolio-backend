@@ -9,7 +9,7 @@ const router = Router();
  * GET /api/health
  * General health check
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response) => {
   try {
     sendSuccess(res, {
       status: 'ok',
@@ -25,7 +25,7 @@ router.get('/', async (req: Request, res: Response) => {
  * GET /api/health/db
  * Database connection health check
  */
-router.get('/db', async (req: Request, res: Response) => {
+router.get('/db', async (_req: Request, res: Response) => {
   try {
     const startTime = Date.now();
     const connected = await testDatabaseConnection();
@@ -48,7 +48,7 @@ router.get('/db', async (req: Request, res: Response) => {
  * GET /api/health/resend
  * Resend API health check
  */
-router.get('/resend', async (req: Request, res: Response) => {
+router.get('/resend', async (_req: Request, res: Response) => {
   try {
     const startTime = Date.now();
     const connected = await testResendConnection();

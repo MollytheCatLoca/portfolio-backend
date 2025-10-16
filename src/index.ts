@@ -35,7 +35,7 @@ function createApp(): Application {
   app.use('/api', routes);
 
   // Root health check (no auth required)
-  app.get('/', (req, res) => {
+  app.get('/', (_req, res) => {
     res.json({
       success: true,
       message: 'Portfolio Backend API',

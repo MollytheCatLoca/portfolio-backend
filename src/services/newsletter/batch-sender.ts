@@ -22,7 +22,7 @@ export async function sendSingleEmail(params: EmailParams): Promise<{
       text: params.textBody,
       cc: params.cc,
       bcc: params.bcc,
-      reply_to: params.replyTo,
+      replyTo: params.replyTo,
       tags: params.tags,
     });
 
@@ -87,13 +87,13 @@ export async function sendBatchEmails(
         text: email.textBody,
         cc: email.cc,
         bcc: email.bcc,
-        reply_to: email.replyTo,
+        replyTo: email.replyTo,
         tags: email.tags,
       }));
 
       // Send complete batch
       const client = getResendClient();
-      const { data, error } = await client.batch.send(batchEmails);
+      const { error } = await client.batch.send(batchEmails);
 
       if (error) {
         // If entire batch fails, mark all as failed
