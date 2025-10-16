@@ -26,6 +26,9 @@ const envSchema = z.object({
   // Newsletter
   MAX_BATCH_SIZE: z.string().default('100').transform(Number),
   MAX_RETRIES: z.string().default('3').transform(Number),
+
+  // Worker
+  WORKER_POLL_INTERVAL: z.string().default('10000').transform(Number), // 10 seconds
 });
 
 // Validate and export environment variables
