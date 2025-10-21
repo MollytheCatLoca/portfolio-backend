@@ -7,6 +7,9 @@ import logger, { newsletterLogger } from '../../utils/logger';
 
 /**
  * Get next pending job from queue
+ *
+ * IMPORTANT: Respects scheduled_at for staged campaigns
+ * Only returns jobs that are ready to be sent (scheduled_at is null or in the past)
  */
 export async function getNextJob(): Promise<QueueJob | null> {
   try {
@@ -16,10 +19,17 @@ export async function getNextJob(): Promise<QueueJob | null> {
       where: {
         status: 'pending',
         retry_count: { lt: env.MAX_RETRIES },
+        // Only get jobs that are scheduled for now or earlier
+        OR: [
+          { scheduled_at: null },
+          { scheduled_at: { lte: new Date() } }
+        ]
       },
-      orderBy: {
-        created_at: 'asc',
-      },
+      orderBy: [
+        // Prioritize by scheduled_at (nulls last)
+        { scheduled_at: 'asc' },
+        { created_at: 'asc' },
+      ],
       take: 1,
     });
 

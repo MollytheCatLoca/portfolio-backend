@@ -115,6 +115,14 @@ model newsletter_queue {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
+  // Stages support
+  campaign_id     String?  @db.Uuid
+  stage_number    Int      @default(1)
+  total_stages    Int      @default(1)
+  stage_size      Int      @default(0)
+
   @@index([status])
   @@index([created_at])
+  @@index([campaign_id])
+  @@index([scheduled_at, status])
 }
