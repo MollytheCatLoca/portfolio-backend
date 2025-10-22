@@ -6,34 +6,49 @@ import { sendBatchEmails } from './batch-sender';
 import logger, { newsletterLogger } from '../../utils/logger';
 
 /**
- * Get next pending job from queue
+ * Get next pending job from queue with atomic lock
  *
- * IMPORTANT: Respects scheduled_at for staged campaigns
- * Only returns jobs that are ready to be sent (scheduled_at is null or in the past)
+ * IMPORTANT:
+ * - Respects scheduled_at for staged campaigns
+ * - Uses UPDATE with FOR UPDATE SKIP LOCKED for atomic row-level locking
+ * - Prevents multiple workers from processing the same job (race condition fix)
+ * - Automatically marks job as 'processing' and sets started_at
  */
 export async function getNextJob(): Promise<QueueJob | null> {
   try {
     const prisma = getPrismaClient();
+    const now = new Date();
 
-    const jobs = await prisma.newsletter_queue.findMany({
-      where: {
-        status: 'pending',
-        retry_count: { lt: env.MAX_RETRIES },
-        // Only get jobs that are scheduled for now or earlier
-        OR: [
-          { scheduled_at: null },
-          { scheduled_at: { lte: new Date() } }
-        ]
-      },
-      orderBy: [
-        // Prioritize by scheduled_at (nulls last)
-        { scheduled_at: 'asc' },
-        { created_at: 'asc' },
-      ],
-      take: 1,
-    });
+    // ✅ Atomic lock: UPDATE with subquery + FOR UPDATE SKIP LOCKED
+    // This ensures only ONE worker can claim a job, preventing duplicates
+    const jobs = await prisma.$queryRaw<QueueJob[]>`
+      UPDATE newsletter_queue
+      SET
+        status = 'processing',
+        started_at = NOW()
+      WHERE id = (
+        SELECT id
+        FROM newsletter_queue
+        WHERE status = 'pending'
+          AND retry_count < ${env.MAX_RETRIES}
+          AND (scheduled_at IS NULL OR scheduled_at <= ${now})
+        ORDER BY
+          scheduled_at ASC NULLS LAST,
+          created_at ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING *
+    `;
 
-    return jobs.length > 0 ? (jobs[0] as any as QueueJob) : null;
+    if (jobs.length > 0) {
+      newsletterLogger.info('🔒 Job locked for processing', {
+        jobId: jobs[0].id,
+        subject: jobs[0].subject,
+      });
+    }
+
+    return jobs.length > 0 ? jobs[0] : null;
   } catch (error) {
     logger.error('Error fetching next job:', error);
     return null;
@@ -60,6 +75,8 @@ export async function getJobById(jobId: string): Promise<QueueJob | null> {
 
 /**
  * Update job progress
+ *
+ * NOTE: started_at is set by getNextJob() with atomic lock, not here
  */
 export async function updateJobProgress(
   jobId: string,
@@ -82,9 +99,7 @@ export async function updateJobProgress(
       updateData.total_recipients = totalRecipients;
     }
 
-    if (status === 'processing' && sentCount === 0) {
-      updateData.started_at = new Date();
-    }
+    // ✅ started_at is set by getNextJob() with atomic lock - no need to set here
 
     if (status === 'completed' || status === 'error' || status === 'cancelled') {
       updateData.completed_at = new Date();
@@ -132,16 +147,18 @@ export async function incrementRetryCount(jobId: string): Promise<void> {
 
 /**
  * Process a newsletter job
+ *
+ * NOTE: Job is already marked as 'processing' by getNextJob() with atomic lock
  */
 export async function processJob(job: QueueJob): Promise<ProcessJobResult> {
   newsletterLogger.info(`Processing job ${job.id}`, {
     jobId: job.id,
     listIds: job.list_ids,
+    status: job.status, // Should be 'processing' from getNextJob()
   });
 
   try {
-    // Mark as processing
-    await updateJobProgress(job.id, 'processing', 0, 0);
+    // ✅ No need to mark as 'processing' - already done by getNextJob() with atomic lock
 
     // Get contacts from distribution lists
     newsletterLogger.info('Fetching contacts...');
