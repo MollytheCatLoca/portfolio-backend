@@ -126,3 +126,26 @@ model newsletter_queue {
   @@index([campaign_id])
   @@index([scheduled_at, status])
 }
+
+// ============================================================================
+// WORKER SESSION TRACKING
+// ============================================================================
+
+model worker_sessions {
+  id                  String    @id @default(uuid()) @db.Uuid
+  instance_id         String    @unique  // hostname-pid-timestamp
+  hostname            String
+  pid                 Int
+  status              String    @default("starting")  // starting, running, stopping, stopped, crashed
+  current_job_id      String?   @db.Uuid
+  current_job_subject String?
+  started_at          DateTime  @default(now())
+  last_heartbeat_at   DateTime  @default(now())
+  stopped_at          DateTime?
+  jobs_processed      Int       @default(0)
+  jobs_failed         Int       @default(0)
+  metadata            Json?     // version, config, environment info, etc.
+
+  @@index([status, last_heartbeat_at])
+  @@index([hostname])
+}

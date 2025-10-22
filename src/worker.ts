@@ -12,6 +12,16 @@ import env from './config/env';
 import { testDatabaseConnection, disconnectDatabase } from './config/database';
 import { getNextJob, processJob } from './services/newsletter/queue-processor';
 import logger, { newsletterLogger } from './utils/logger';
+import {
+  startSession,
+  markSessionRunning,
+  updateHeartbeat,
+  setCurrentJob,
+  clearCurrentJob,
+  incrementJobCounter,
+  markSessionStopping,
+  stopSession,
+} from './services/newsletter/session-manager';
 
 // Worker configuration
 const POLL_INTERVAL = env.WORKER_POLL_INTERVAL || 10000; // 10 seconds
@@ -34,6 +44,9 @@ async function pollQueue(): Promise<void> {
   try {
     isProcessing = true;
 
+    // Update heartbeat (every poll cycle)
+    await updateHeartbeat();
+
     // Get next pending job
     const job = await getNextJob();
 
@@ -49,8 +62,15 @@ async function pollQueue(): Promise<void> {
       retryCount: job.retry_count,
     });
 
+    // Set current job in session
+    await setCurrentJob(job.id, job.subject);
+
     // Process the job
     const result = await processJob(job);
+
+    // Clear current job and update counters
+    await clearCurrentJob();
+    await incrementJobCounter(result.success);
 
     if (result.success) {
       newsletterLogger.info(`✅ Job completed successfully`, {
@@ -67,6 +87,8 @@ async function pollQueue(): Promise<void> {
     }
   } catch (error) {
     logger.error('Error in worker poll cycle:', error);
+    // Clear current job on error
+    await clearCurrentJob();
   } finally {
     isProcessing = false;
   }
@@ -86,6 +108,10 @@ async function startWorker(): Promise<void> {
     logger.info('🔍 Testing database connection...');
     await testDatabaseConnection();
 
+    // Start session and check for duplicates
+    logger.info('🔐 Starting worker session...');
+    await startSession();
+
     // Display configuration
     logger.info('📍 Environment: ' + env.NODE_ENV);
     logger.info(`🗄️  Database: ${env.DATABASE_URL?.split('@')[1]?.split('?')[0] || 'configured'}`);
@@ -97,6 +123,9 @@ async function startWorker(): Promise<void> {
     logger.info('🚀 Worker started - Press Ctrl+C to stop');
     logger.info('');
 
+    // Mark session as running
+    await markSessionRunning();
+
     // Start polling
     pollIntervalId = setInterval(pollQueue, POLL_INTERVAL);
 
@@ -104,6 +133,8 @@ async function startWorker(): Promise<void> {
     pollQueue();
   } catch (error) {
     logger.error('❌ Failed to start worker:', error);
+    // Try to stop session on startup error
+    await stopSession();
     process.exit(1);
   }
 }
@@ -120,6 +151,9 @@ async function gracefulShutdown(signal: string): Promise<void> {
 
   logger.info('');
   logger.info(`${signal} received. Starting graceful shutdown...`);
+
+  // Mark session as stopping
+  await markSessionStopping();
 
   // Stop accepting new jobs
   if (pollIntervalId) {
@@ -144,6 +178,9 @@ async function gracefulShutdown(signal: string): Promise<void> {
       logger.info('✅ Current job completed');
     }
   }
+
+  // Stop session
+  await stopSession();
 
   // Disconnect database
   await disconnectDatabase();
