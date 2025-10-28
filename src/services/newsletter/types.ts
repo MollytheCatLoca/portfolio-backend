@@ -50,6 +50,10 @@ export interface BatchEmailResult {
     email: string;
     error: string;
   }>;
+  emailIds?: Array<{
+    email: string;
+    resendId: string;
+  }>;
 }
 
 export interface JobProgress {

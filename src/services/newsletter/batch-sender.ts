@@ -93,7 +93,7 @@ export async function sendBatchEmails(
 
       // Send complete batch
       const client = getResendClient();
-      const { error } = await client.batch.send(batchEmails);
+      const { data, error } = await client.batch.send(batchEmails);
 
       if (error) {
         // If entire batch fails, mark all as failed
@@ -108,6 +108,23 @@ export async function sendBatchEmails(
       } else {
         // Batch successful
         results.successful += chunk.length;
+
+        // ✅ Track successful sends with Resend IDs for webhook tracking
+        if (!results.emailIds) {
+          results.emailIds = [];
+        }
+
+        if (data && Array.isArray(data)) {
+          data.forEach((item, index) => {
+            if (item.id && chunk[index]) {
+              const emailTo = chunk[index].to;
+              results.emailIds!.push({
+                email: Array.isArray(emailTo) ? emailTo[0] : emailTo,
+                resendId: item.id,
+              });
+            }
+          });
+        }
 
         // Log every 100 emails
         if ((chunkIndex + 1) * batchSize % 100 === 0 || chunkIndex === chunks.length - 1) {

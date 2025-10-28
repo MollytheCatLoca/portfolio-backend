@@ -70,6 +70,41 @@ export function isValidEmail(email: string): boolean {
 }
 
 /**
+ * Get recipients pre-saved for a staged job
+ * Returns null if no recipients are saved (legacy behavior - use list_ids instead)
+ */
+export async function getRecipientsForJob(jobId: string): Promise<Contact[] | null> {
+  try {
+    const prisma = getPrismaClient();
+
+    // Check if job has pre-saved recipients (staged campaigns)
+    const recipients = await prisma.$queryRaw<Contact[]>`
+      SELECT
+        cc.id,
+        cc.nombre,
+        cc.apellido,
+        cc.email,
+        cc.activo
+      FROM newsletter_queue_recipients nqr
+      JOIN client_contacts cc ON nqr.contact_id = cc.id
+      WHERE nqr.queue_id = ${jobId}::uuid
+        AND cc.activo = true
+    `;
+
+    if (recipients.length === 0) {
+      newsletterLogger.info('No pre-saved recipients found, will use list_ids fallback');
+      return null;
+    }
+
+    newsletterLogger.info(`Found ${recipients.length} pre-saved recipients for staged job`);
+    return recipients;
+  } catch (error) {
+    logger.error('Error fetching recipients for job:', error);
+    return null; // Fallback to list_ids on error
+  }
+}
+
+/**
  * Filter and validate contacts
  */
 export function validateContacts(contacts: Contact[]): Contact[] {

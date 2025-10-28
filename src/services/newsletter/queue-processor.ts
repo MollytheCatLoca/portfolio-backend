@@ -1,7 +1,7 @@
 import getPrismaClient from '../../config/database';
 import env from '../../config/env';
 import { QueueJob, ProcessJobResult, EmailParams } from './types';
-import { getContactsFromLists, validateContacts } from './contact-resolver';
+import { getContactsFromLists, validateContacts, getRecipientsForJob } from './contact-resolver';
 import { sendBatchEmails } from './batch-sender';
 import logger, { newsletterLogger } from '../../utils/logger';
 
@@ -160,9 +160,15 @@ export async function processJob(job: QueueJob): Promise<ProcessJobResult> {
   try {
     // ✅ No need to mark as 'processing' - already done by getNextJob() with atomic lock
 
-    // Get contacts from distribution lists
+    // Get contacts: Try pre-saved recipients first (staged campaigns), fallback to list_ids
     newsletterLogger.info('Fetching contacts...');
-    const contacts = await getContactsFromLists(job.list_ids);
+    let contacts = await getRecipientsForJob(job.id);
+
+    // Fallback to list_ids if no pre-saved recipients (legacy/normal sends)
+    if (!contacts) {
+      newsletterLogger.info('Using distribution lists (no pre-saved recipients found)');
+      contacts = await getContactsFromLists(job.list_ids);
+    }
 
     if (contacts.length === 0) {
       throw new Error('No active contacts found in selected distribution lists');
@@ -193,6 +199,29 @@ export async function processJob(job: QueueJob): Promise<ProcessJobResult> {
 
     // Send emails in batches
     const result = await sendBatchEmails(emailsToSend);
+
+    // ✅ Save Resend email IDs for webhook tracking
+    // This is critical for staged campaigns where recipients were pre-saved
+    if (result.emailIds && result.emailIds.length > 0) {
+      const prisma = getPrismaClient();
+      try {
+        for (const { email, resendId } of result.emailIds) {
+          await prisma.$executeRaw`
+            UPDATE newsletter_queue_recipients
+            SET
+              resend_email_id = ${resendId},
+              status = 'sent',
+              sent_at = NOW(),
+              updated_at = NOW()
+            WHERE queue_id = ${job.id}::uuid
+              AND email = ${email}
+          `;
+        }
+        newsletterLogger.info(`Updated ${result.emailIds.length} Resend IDs in tracking table`);
+      } catch (error) {
+        logger.warn('Error updating Resend IDs (non-critical):', error);
+      }
+    }
 
     // Update final progress
     await updateJobProgress(
