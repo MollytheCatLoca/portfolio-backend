@@ -95,6 +95,19 @@ export async function sendBatchEmails(
       const client = getResendClient();
       const { data, error } = await client.batch.send(batchEmails);
 
+      // 🔍 DEBUG: Log estructura completa de respuesta de Resend
+      newsletterLogger.info('=== RESEND BATCH.SEND DEBUG ===', {
+        hasError: !!error,
+        errorMessage: error?.message || null,
+        dataType: typeof data,
+        isDataArray: Array.isArray(data),
+        dataKeys: data ? Object.keys(data) : null,
+        hasDataProperty: data && 'data' in data,
+        innerDataIsArray: data && data.data ? Array.isArray(data.data) : false,
+        innerDataLength: data && data.data && Array.isArray(data.data) ? data.data.length : null,
+        chunkLength: chunk.length
+      });
+
       if (error) {
         // If entire batch fails, mark all as failed
         newsletterLogger.error(`Error in batch ${chunkIndex + 1}:`, error);
@@ -109,13 +122,15 @@ export async function sendBatchEmails(
         // Batch successful
         results.successful += chunk.length;
 
-        // ✅ Track successful sends with Resend IDs for webhook tracking
+        // ✅ FIX: Track successful sends with Resend IDs for webhook tracking
+        // Resend returns: { data: { data: [{ id: 'xxx' }, { id: 'yyy' }] } }
         if (!results.emailIds) {
           results.emailIds = [];
         }
 
-        if (data && Array.isArray(data)) {
-          data.forEach((item, index) => {
+        // ✅ FIXED: Access data.data (not just data)
+        if (data && data.data && Array.isArray(data.data)) {
+          data.data.forEach((item: any, index: number) => {
             if (item.id && chunk[index]) {
               const emailTo = chunk[index].to;
               results.emailIds!.push({
@@ -125,6 +140,14 @@ export async function sendBatchEmails(
             }
           });
         }
+
+        // 🔍 DEBUG: Log IDs capturados
+        newsletterLogger.info('=== EMAIL IDS CAPTURED ===', {
+          emailIdsCount: results.emailIds?.length || 0,
+          emailIdsSample: results.emailIds?.slice(0, 3) || [],
+          resultSuccessful: results.successful,
+          resultFailed: results.failed
+        });
 
         // Log every 100 emails
         if ((chunkIndex + 1) * batchSize % 100 === 0 || chunkIndex === chunks.length - 1) {

@@ -151,17 +151,16 @@ router.get('/mailing/newsletter/status/:id', async (req: Request, res: Response)
     }
 
     return sendSuccess(res, {
-      job: {
-        id: job.id,
-        status: job.status,
-        progress: job.total_recipients > 0 
-          ? Math.round((job.sent_count / job.total_recipients) * 100) 
-          : 0,
-        sent: job.sent_count,
-        failed: job.failed_count,
-        total: job.total_recipients,
-        error: job.error_message,
-      },
+      id: job.id,
+      status: job.status,
+      sent_count: job.sent_count,
+      failed_count: job.failed_count,
+      total_recipients: job.total_recipients,
+      error_message: job.error_message,
+      created_at: job.created_at,
+      started_at: job.started_at,
+      completed_at: job.completed_at,
+      retry_count: job.retry_count || 0,
     });
   } catch (error: any) {
     logger.error('Error fetching job status:', error);
