@@ -192,7 +192,7 @@ export async function processJob(job: QueueJob): Promise<ProcessJobResult> {
       subject: job.subject,
       htmlBody: job.html_content,
       textBody: job.text_content || undefined,
-      from: process.env.RESEND_FROM_EMAIL || 'mensajes@bisintegraciones.com',
+      from: process.env.RESEND_FROM_EMAIL || 'BIS Integraciones <novedades@newsletter.bisintegraciones.com>',
     }));
 
     newsletterLogger.info(`Sending ${emailsToSend.length} emails via Resend...`);

@@ -15,6 +15,7 @@ const envSchema = z.object({
 
   // Resend
   RESEND_API_KEY: z.string().startsWith('re_'),
+  RESEND_FROM_EMAIL: z.string().optional().default('BIS Integraciones <novedades@newsletter.bisintegraciones.com>'),
 
   // Security
   API_KEY: z.string().min(20),

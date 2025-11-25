@@ -15,7 +15,7 @@ export async function sendSingleEmail(params: EmailParams): Promise<{
     const client = getResendClient();
 
     const { data, error } = await client.emails.send({
-      from: params.from || process.env.RESEND_FROM_EMAIL || 'noreply@example.com',
+      from: params.from || process.env.RESEND_FROM_EMAIL || 'BIS Integraciones <novedades@newsletter.bisintegraciones.com>',
       to: params.to,
       subject: params.subject,
       html: params.htmlBody,
@@ -80,7 +80,7 @@ export async function sendBatchEmails(
     try {
       // Prepare batch for Resend
       const batchEmails = chunk.map((email) => ({
-        from: email.from || process.env.RESEND_FROM_EMAIL || 'noreply@example.com',
+        from: email.from || process.env.RESEND_FROM_EMAIL || 'BIS Integraciones <novedades@newsletter.bisintegraciones.com>',
         to: email.to,
         subject: email.subject,
         html: email.htmlBody,
